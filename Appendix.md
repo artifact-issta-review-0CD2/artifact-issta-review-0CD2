@@ -200,4 +200,131 @@ The following table lists the code obfuscation techniques:
 
 *Comparison of OT-based and GNN-based graph similarity scoring. The OT-based method maintains clearer separation between positive and negative pairs.*
 
+### Obfuscation Robustness Evaluation
+
+To evaluate the robustness of our approach against code obfuscation techniques, we conducted comprehensive experiments on both Android and HarmonyOS platforms. We tested the identification performance under various single obfuscation techniques as well as their combinations.
+
+#### HarmonyOS Obfuscation Results
+
+For HarmonyOS applications, we evaluated four categories of obfuscation techniques: **Basic** (identifier renaming), **Data** (data flow obfuscation), **Inst** (instruction-level transformations), and **Ctrl** (control flow obfuscation). The following table presents the identification performance:
+
+**Table: Obfuscation identification performance on HarmonyOS**
+
+<table>
+<thead>
+<tr>
+<th align="center">Obfuscation Type</th>
+<th align="center">Basic</th>
+<th align="center">Data</th>
+<th align="center">Inst</th>
+<th align="center">Ctrl</th>
+<th align="center">Precision</th>
+<th align="center">Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr><td colspan="7" align="left"><strong>Single Obfuscation</strong></td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">100.00%</td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td></td><td></td><td align="center">85.00%</td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td align="center">✓</td><td></td><td align="center">100.00%</td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td align="center">✓</td><td align="center">75.00%</td><td align="center">88.00%</td></tr>
+<tr><td colspan="7" align="left"><strong>Combination Obfuscation</strong></td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td align="center">94.00%</td><td align="center">100.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td></td><td align="center">83.00%</td><td align="center">88.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">100.00%</td><td align="center">94.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td></td><td align="center">✓</td><td align="center">93.00%</td><td align="center">82.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">78.00%</td><td align="center">82.00%</td></tr>
+<tr><td></td><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">84.00%</td><td align="center">94.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">76.00%</td><td align="center">94.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">68.00%</td><td align="center">82.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">78.00%</td><td align="center">82.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">100.00%</td><td align="center">88.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">68.00%</td><td align="center">88.00%</td></tr>
+</tbody>
+</table>
+
+The results demonstrate that our approach maintains high identification accuracy even under single obfuscation techniques, achieving 100% recall for most cases. For combination obfuscation scenarios, the performance remains robust with recall rates ranging from 82% to 100%, indicating strong resilience against complex obfuscation strategies.
+
+#### Android Obfuscation Results
+
+For Android applications, we evaluated 15 distinct obfuscation techniques covering control flow manipulation, reflection, instruction reordering, and various encryption methods. The following table shows the recall performance:
+
+**Table: Android obfuscation identification performance**
+
+<table>
+<thead>
+<tr>
+<th align="left">Obfuscation Type</th>
+<th align="center">GOTO</th>
+<th align="center">REF</th>
+<th align="center">RE-ORD</th>
+<th align="center">NOP</th>
+<th align="center">FLD-RN</th>
+<th align="center">STR-ENC</th>
+<th align="center">DBG-RMV</th>
+<th align="center">ARITH</th>
+<th align="center">RES-ENC</th>
+<th align="center">MTH-OV</th>
+<th align="center">CLS-RN</th>
+<th align="center">ADV-REF</th>
+<th align="center">MAN-RND</th>
+<th align="center">CALL-IND</th>
+<th align="center">LIB-ENC</th>
+<th align="center">Recall</th>
+</tr>
+</thead>
+<tbody>
+<tr><td colspan="17" align="left"><strong>Single Obfuscation</strong></td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">95.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td align="center">95.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">75.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td align="center">100.00%</td></tr>
+<tr><td colspan="17" align="left"><strong>Combination Obfuscation</strong></td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">86.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td align="center">88.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">89.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td align="center">86.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">89.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td></td><td></td><td align="center">✓</td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td></td><td></td><td align="center">✓</td><td></td><td align="center">89.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td></td><td></td><td align="center">88.00%</td></tr>
+<tr><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">89.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td></td><td align="center">100.00%</td></tr>
+<tr><td></td><td align="center">✓</td><td></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">✓</td><td></td><td></td><td></td><td align="center">✓</td><td align="center">✓</td><td></td><td align="center">✓</td><td></td><td align="center">86.00%</td></tr>
+</tbody>
+</table>
+**Abbreviations:**
+
+- **GOTO**: Control Flow (goto injection)
+- **REF**: Reflection
+- **RE-ORD**: Instruction Reordering
+- **NOP**: No-Operation insertion
+- **FLD-RN**: Field Renaming
+- **STR-ENC**: String Encryption
+- **DBG-RMV**: Debug Information Removal
+- **ARITH**: Arithmetic Branch obfuscation
+- **RES-ENC**: Resource Encryption
+- **MTH-OV**: Method Overloading
+- **CLS-RN**: Class Renaming
+- **ADV-REF**: Advanced Reflection
+- **MAN-RND**: Manifest Randomization
+- **CALL-IND**: Call Indirection
+- **LIB-ENC**: Library Encryption
+
+The Android obfuscation results show that our approach achieves excellent recall rates (≥95%) for most single obfuscation techniques. Even under complex combination obfuscation scenarios involving up to 8 different techniques simultaneously, the system maintains recall rates between 86% and 100%, demonstrating strong robustness against sophisticated obfuscation strategies commonly employed in real-world malicious applications.
 
