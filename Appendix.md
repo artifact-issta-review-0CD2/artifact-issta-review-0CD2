@@ -143,6 +143,22 @@ Since none of these systems provide public implementations, we re-implement thei
 
 - **FSquaDRA**: Resource fingerprints are generated from manifests, XML layouts, and drawable assets. We follow the original design by using perceptual hashing (`pHash`) and the resource-overlap coefficient for similarity scoring. The threshold is again calibrated using D1.
 
+### Counterfeit Assessment Criteria
+
+The evaluation framework assesses potential counterfeits along three key dimensions:
+
+**Criterion 1: Core Feature and Logic Plagiarism**
+
+This criterion identifies counterfeit apps through direct, non-transformative replication of an original app's principal features and core workflow logic. It extends beyond operating in the same service category to copying proprietary operational sequences. For example, a counterfeit financial app duplicating the end-to-end user journey from account registration to loan disbursement. Such replication reflects minimal innovation and deliberate imitation of the original app's fundamental purpose.
+
+**Criterion 2: User Interface and Experience Cloning**
+
+This dimension evaluates high-fidelity, non-coincidental replication of visual and interactive elements, including icons, color schemes, layouts, and navigation patterns. The mimicry surpasses common design trends, indicating a purposeful effort to deceive users by emulating the legitimate app's "look and feel."
+
+**Criterion 3: Semantic Similarity in Declared Data Practices**
+
+This criterion focuses on substantive similarity in data handling declarations, such as privacy policies. Counterfeit apps often exhibit congruent structures, data type descriptions, and phrasing for third-party data sharing. High semantic alignment, especially when combined with other signals, strongly suggests a counterfeit relationship, as independently developed apps typically articulate distinct data practices.
+
 ## Supplementary Materials
 
 ### APK File Structure
