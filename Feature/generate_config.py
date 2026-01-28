@@ -2,9 +2,8 @@
 import os
 
 def generate_config():
-    # Use relative paths
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    input_path = os.path.join(script_dir, "res", "omm_filter_tpl.txt")
+    input_path = os.path.join(script_dir, "res", "smaliopcode_filter_tpl.txt")
     output_path = os.path.join(script_dir, "feature_config.py")
     
     if not os.path.exists(input_path):

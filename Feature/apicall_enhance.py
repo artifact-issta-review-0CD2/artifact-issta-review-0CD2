@@ -2,7 +2,6 @@ import pickle
 import concurrent.futures
 import networkx as nx
 
-# 读取.pkl文件
 def load_nodes_with_vectors(file_path):
     try:
         with open(file_path, 'rb') as f:
@@ -12,7 +11,6 @@ def load_nodes_with_vectors(file_path):
         print("Error reading .pkl file:", e)
         return None
 
-# 读取.txt文件
 def read_nodes_from_txt(file_path):
     with open(file_path, 'r') as f:
             lines = f.readlines()
@@ -22,7 +20,6 @@ def read_nodes_from_txt(file_path):
     
 def read_graph_from_gexf(file_path):
     try:
-        # 使用networkx库读取GEXF文件
         G = nx.read_gexf(file_path)
         return G
     except Exception as e:
@@ -38,7 +35,6 @@ def traverse_graph(graph,nodes_txt,nodes_with_vectors):
         if lib_name and function_name:
             api_name = lib_name + "." + function_name
         else:
-            # 如果其中一个为空，就是类节点
             api_name = lib_name
         if api_name in nodes_txt:
             index = nodes_txt.index(api_name)

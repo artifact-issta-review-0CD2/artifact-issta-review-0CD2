@@ -19,14 +19,8 @@ from so_trainer import SoTrainer
 from feature_cnn_models import SOOpcodeDetailCaptureCNN
 from so_tester import extract_and_detect_matrix, sweep_thresholds
 
-# ------------------------------
-# 1. 模型定义 (已移至 cnn.py)
-# ------------------------------
 
 
-# ------------------------------
-# 2. 路径解析与 Dataset (IO 优化)
-# ------------------------------
 
 def list_group_ids(root_dir: str) -> List[str]:
     if not os.path.exists(root_dir):
@@ -69,7 +63,6 @@ def pre_resolve_paths(projects: List[str]) -> Dict[str, str]:
             mapping[p] = npy
     return mapping
 
-# --- Datasets ---
 
 class SoPairDataset(Dataset):
     def __init__(self, pairs: List[Tuple[str, str, int]], path_mapping: Dict[str, str]):
@@ -87,15 +80,12 @@ class SoPairDataset(Dataset):
             if not npy:
                 return torch.zeros((1, 94, 94), dtype=torch.float32)
             try:
-                # allow_pickle=True 因为有些npy可能是object数组
                 mat = np.load(npy, allow_pickle=True)
                 t = torch.tensor(mat, dtype=torch.float32)
-                # 确保维度 [1, 94, 94]
                 if t.dim() == 2:
                     t = t.unsqueeze(0)
                 return t
             except Exception:
-                # 【关键】保持尺寸一致，防止DataLoader崩溃
                 return torch.zeros((1, 94, 94), dtype=torch.float32)
 
         t1 = load(p1)
@@ -104,9 +94,6 @@ class SoPairDataset(Dataset):
         return t1, t2, y, p1, p2, label
 
 
-# ------------------------------
-# 3. 核心功能函数
-# ------------------------------
 
 def build_positive_pairs(originals: List[str], repacks: List[str]) -> List[Tuple[str, str, int]]:
     pairs = []
@@ -143,7 +130,6 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     """
     矩阵化测试流程：批量提取 -> GPU点积
     """
-    # 1. 准备 Unique APKs
     unique_projs = set()
     for p1, p2, _ in test_pairs:
         unique_projs.add(p1)
@@ -151,7 +137,6 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     unique_projs = list(unique_projs)
     proj_to_idx = {p: i for i, p in enumerate(unique_projs)}
     
-    # 2. 批量提取特征
     dataset = SingleSoDataset(unique_projs, path_mapping)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, 
                         num_workers=workers, collate_fn=collate_fn_single, pin_memory=True)
@@ -165,9 +150,8 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
         for paths, tensors in tqdm(loader, desc="[测试] 批量特征提取", unit="batch"):
             if tensors is None: continue
             tensors = tensors.to(device)
-            # model(x) 只传一个参数时调用 forward_once -> 已归一化
             feats = model(tensors) 
-            all_feats.append(feats.cpu()) # 先存CPU防OOM
+            all_feats.append(feats.cpu())
             for p in paths:
                 all_indices.append(proj_to_idx[p])
                 
@@ -176,20 +160,16 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     if not all_feats:
         return pd.DataFrame(), feat_time, 0.0
 
-    # 3. 构建大矩阵
     dim = all_feats[0].size(1)
-    full_matrix = torch.zeros((len(unique_projs), dim), device=device) # 移入GPU
+    full_matrix = torch.zeros((len(unique_projs), dim), device=device)
     
     current_ptr = 0
     for batch_feats in all_feats:
         b_size = batch_feats.size(0)
-        # 获取 batch 对应的全局 indices
         batch_indices = all_indices[current_ptr : current_ptr + b_size]
-        # 移入 GPU 填表
         full_matrix[batch_indices] = batch_feats.to(device)
         current_ptr += b_size
         
-    # 4. 矩阵点积计算相似度
     t_detect_start = time.time()
     idx_a_list, idx_b_list, meta_list = [], [], []
     
@@ -205,14 +185,12 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     idx_a = torch.tensor(idx_a_list, device=device)
     idx_b = torch.tensor(idx_b_list, device=device)
     
-    # Cosine Similarity = Dot Product (Pre-normalized)
     vec_a = full_matrix[idx_a]
     vec_b = full_matrix[idx_b]
     sims = (vec_a * vec_b).sum(dim=1).cpu().numpy()
     
     detect_time = time.time() - t_detect_start
     
-    # 5. 组装结果
     results = []
     for i, (p1, p2, lab) in enumerate(meta_list):
         results.append({
@@ -252,9 +230,6 @@ def sweep_thresholds(results_df, start=0.5, end=0.99, step=0.01):
     return pd.DataFrame(rows)
 
 
-# ------------------------------
-# 4. 主流程
-# ------------------------------
 
 def run_so_detection(args):
     """
@@ -275,12 +250,10 @@ def run_so_detection(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"[SO] Device: {device}")
 
-    # 1. 扫描路径
     print("[SO] 扫描 SO 矩阵路径...")
     t_scan = time.time()
     all_groups = list_group_ids(args.root)
     
-    # 抽样
     if hasattr(args, 'sample_fraction') and args.sample_fraction < 1.0:
         import math
         sample_n = max(1, math.ceil(len(all_groups) * args.sample_fraction))
@@ -302,14 +275,12 @@ def run_so_detection(args):
         print("[SO] 无数据，退出。")
         return None
 
-    # 2. 构建配对
     print("[SO] 构建样本对...")
     valid_projs_set = set(path_mapping.keys())
     all_pairs = []
     
     for gid in tqdm(all_groups, desc="配对") if show_progress else all_groups:
         o, r = list_apk_projects_in_group(args.root, gid)
-        # 仅保留有效的
         o = [p for p in o if p in valid_projs_set]
         r = [p for p in r if p in valid_projs_set]
         if not o or not r: continue
@@ -317,7 +288,6 @@ def run_so_detection(args):
         pos = build_positive_pairs(o, r)
         all_pairs.extend(pos)
         
-        # 负样本采样
         target_neg = len(pos)
         neg_candidates = sample_negative_pairs(all_group_projs, gid, target_neg * 2)
         valid_negs = []
@@ -330,7 +300,6 @@ def run_so_detection(args):
     random.shuffle(all_pairs)
     print(f"[SO] 总样本对数: {len(all_pairs)}")
 
-    # 划分
     total = len(all_pairs)
     n_train = int(total * 0.7)
     n_val = int(total * 0.1)
@@ -338,13 +307,11 @@ def run_so_detection(args):
     val_pairs = all_pairs[n_train:n_train+n_val]
     test_pairs = all_pairs[n_train+n_val:]
     
-    # DataLoader (Val batch_size = args.batch_size)
     train_loader = DataLoader(SoPairDataset(train_pairs, path_mapping), 
                               batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
     val_loader = DataLoader(SoPairDataset(val_pairs, path_mapping), 
                             batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
 
-    # 3. 训练与模型加载
     model_path = args.model_path if args.model_path else os.path.join(args.result_root, 'so_model.pth')
     trainer = SoTrainer(device, learning_rate=args.lr, margin=args.margin, neg_weight=args.neg_weight)
     train_time_total = 0.0
@@ -366,7 +333,6 @@ def run_so_detection(args):
         print("[SO] 训练完成，仅训练模式结束。")
         return {'train_time_s': train_time_total}
 
-    # 4. 测试 (Matrix Accelerated)
     print("\n[SO] 开始矩阵化测试...")
     df_res, feat_time, detect_time = extract_and_detect_matrix(
         model, device, test_pairs, path_mapping, args.batch_size, args.workers
@@ -376,11 +342,7 @@ def run_so_detection(args):
         print("[SO] 测试结果为空。")
         return None
 
-    # 5. 阈值选择与指标计算
-    # 先在 Val Set 上跑一遍矩阵测试（或者利用训练时的结果，这里为了简单直接在Test结果上做推荐逻辑的模拟，
-    # 实际上应该用 Val 结果定阈值，再应用到 Test。为了逻辑严谨，我们先扫 Val）
     
-    # 这里我们简化逻辑：如果开启 auto-threshold，我们在 Val 集上做一次矩阵评估来定阈值
     final_threshold = args.threshold
     strategy_name = "manual"
     
@@ -389,7 +351,6 @@ def run_so_detection(args):
         df_val, _, _ = extract_and_detect_matrix(model, device, val_pairs, path_mapping, args.batch_size, args.workers)
         sweep_df = sweep_thresholds(df_val)
         
-        # 策略：满足 precision >= target 且 recall >= min_recall
         candidates = sweep_df[
             (sweep_df['recall'] >= args.min_recall) & 
             (sweep_df['precision'] >= args.target_precision)
@@ -401,13 +362,11 @@ def run_so_detection(args):
             strategy_name = "auto_precision_priority"
             print(f"[SO] 自动阈值: {final_threshold:.3f} (P={best_row['precision']:.3f}, R={best_row['recall']:.3f})")
         else:
-            # 如果没找到满足条件的，就找 F1 最高的
             best_row = sweep_df.sort_values(by='f1', ascending=False).iloc[0]
             final_threshold = best_row['threshold']
             strategy_name = "auto_max_f1"
             print(f"[SO] 未满足高精度约束，回退到最大F1阈值: {final_threshold:.3f} (F1={best_row['f1']:.3f})")
     
-    # 应用最终阈值到 Test Set
     y_true = df_res['label'].values
     y_scores = df_res['similarity_score'].values
     y_pred = (y_scores >= final_threshold).astype(int)
@@ -452,12 +411,10 @@ def main():
     parser.add_argument('--model-path', default=None, help='指定模型路径(加载或保存)，默认在result-root下so_model.pth')
     parser.add_argument('--no-progress', action='store_true', help='关闭进度条')
     
-    # 阈值策略参数
     parser.add_argument('--auto-threshold', action='store_true', help='自动选择最佳阈值')
     parser.add_argument('--min-recall', type=float, default=0.85, help='自动阈值时的召回率下限')
     parser.add_argument('--target-precision', type=float, default=0.95, help='自动阈值时的精确率目标')
     
-    # 损失参数
     parser.add_argument('--margin', type=float, default=0.5, help='Margin for Contrastive Loss')
     parser.add_argument('--neg-weight', type=float, default=2.0, help='Negative sample weight')
     

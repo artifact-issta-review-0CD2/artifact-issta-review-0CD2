@@ -38,7 +38,6 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     """
     矩阵化测试流程：批量提取 -> GPU点积
     """
-    # 1. 准备 Unique APKs
     unique_projs = set()
     for p1, p2, _ in test_pairs:
         unique_projs.add(p1)
@@ -46,7 +45,6 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     unique_projs = list(unique_projs)
     proj_to_idx = {p: i for i, p in enumerate(unique_projs)}
     
-    # 2. 批量提取特征
     dataset = SingleSoDataset(unique_projs, path_mapping)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, 
                         num_workers=workers, collate_fn=collate_fn_single, pin_memory=True)
@@ -60,9 +58,8 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
         for paths, tensors in tqdm(loader, desc="[测试] 批量特征提取", unit="batch"):
             if tensors is None: continue
             tensors = tensors.to(device)
-            # model(x) 只传一个参数时调用 forward_once -> 已归一化
             feats = model(tensors) 
-            all_feats.append(feats.cpu()) # 先存CPU防OOM
+            all_feats.append(feats.cpu())
             for p in paths:
                 all_indices.append(proj_to_idx[p])
                 
@@ -71,20 +68,16 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     if not all_feats:
         return pd.DataFrame(), feat_time, 0.0
 
-    # 3. 构建大矩阵
     dim = all_feats[0].size(1)
-    full_matrix = torch.zeros((len(unique_projs), dim), device=device) # 移入GPU
+    full_matrix = torch.zeros((len(unique_projs), dim), device=device)
     
     current_ptr = 0
     for batch_feats in all_feats:
         b_size = batch_feats.size(0)
-        # 获取 batch 对应的全局 indices
         batch_indices = all_indices[current_ptr : current_ptr + b_size]
-        # 移入 GPU 填表
         full_matrix[batch_indices] = batch_feats.to(device)
         current_ptr += b_size
         
-    # 4. 矩阵点积计算相似度
     t_detect_start = time.time()
     idx_a_list, idx_b_list, meta_list = [], [], []
     
@@ -100,14 +93,12 @@ def extract_and_detect_matrix(model, device, test_pairs, path_mapping, batch_siz
     idx_a = torch.tensor(idx_a_list, device=device)
     idx_b = torch.tensor(idx_b_list, device=device)
     
-    # Cosine Similarity = Dot Product (Pre-normalized)
     vec_a = full_matrix[idx_a]
     vec_b = full_matrix[idx_b]
     sims = (vec_a * vec_b).sum(dim=1).cpu().numpy()
     
     detect_time = time.time() - t_detect_start
     
-    # 5. 组装结果
     results = []
     for i, (p1, p2, lab) in enumerate(meta_list):
         results.append({

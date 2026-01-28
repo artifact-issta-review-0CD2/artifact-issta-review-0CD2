@@ -15,8 +15,8 @@ class FunctionCallGraph:
         self.filter_functions = FILTER_FUNCTIONS
         self.filter_libraries = [lib.replace('/', '.') for lib in FILTER_LIBRARIES]
         self.function_index_map = {}
-        self.function_index = 1  # 初始化全局函数索引
-        self.lock = threading.Lock()  # 用于确保线程安全的锁
+        self.function_index = 1
+        self.lock = threading.Lock()
 
     def add_edge(self, caller, callee, edge_type='calls', weight=1):
         """添加边并设置边的类型（例如调用）"""
@@ -30,7 +30,7 @@ class FunctionCallGraph:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(self.parse_smali_file, smali_file) for smali_file in smali_files]
             for future in concurrent.futures.as_completed(futures):
-                future.result()  # 确保所有线程都完成
+                future.result()
 
     def parse_smali_file(self, filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -39,13 +39,11 @@ class FunctionCallGraph:
             current_lib = None
 
             for line in lines:
-                # 获取当前类库名
                 if line.startswith(".class"):
                     match = re.match(r".*?L([^;]+);", line)
                     if match:
                         current_lib = match.group(1).replace('/', '.')
 
-                # 处理方法定义
                 if line.startswith(".method"):
                     caller = self.extract_method_name(line)
 
@@ -55,29 +53,24 @@ class FunctionCallGraph:
                     if caller is None or self.is_junk_method(caller):
                         continue
 
-                    # 添加方法节点
                     if caller not in self.function_index_map:
                         with self.lock:
                             self.function_index_map[caller] = self.function_index
                             self.add_node(self.function_index, 'method', lib_name=current_lib, function_name=caller)
                             self.function_index += 1
 
-                # 处理调用指令
                 elif line.startswith("    invoke"):
                     callee = self.extract_invoke_target(line)
                     lib = self.extract_lib(line) or current_lib
 
-                    # 添加调用关系边
                     if self.function_index_map.get(caller) and callee and lib:
                         if not self.is_junk_method(callee) and callee not in self.filter_functions:
-                            # 如果被调用方法不存在于图中，添加该方法节点
                             if callee not in self.function_index_map:
                                 with self.lock:
                                     self.function_index_map[callee] = self.function_index
                                     self.add_node(self.function_index, 'method', lib_name=lib, function_name=callee)
                                     self.function_index += 1
 
-                            # 添加调用关系边
                             self.add_edge(self.function_index_map.get(caller),
                                           self.function_index_map.get(callee),
                                           edge_type='calls')
@@ -86,25 +79,20 @@ class FunctionCallGraph:
         if method_name is None:
             return True
 
-        # 检查常见无效方法名特征
-        if "." in method_name:  # 如果包含点，可能是有效的方法引用
+        if "." in method_name:
             return False
 
-        if len(method_name) < 3:  # 太短的方法名
+        if len(method_name) < 3:
             return True
 
-        # 检查特殊字符
         for char in method_name:
             if char in '<>$&1234567890':
                 return True
 
-        # 检查看起来像随机字符串的名称
         if len(method_name) >= 8:
-            # 统计大写字母数量
             upper_count = sum(1 for c in method_name if c.isupper())
             upper_ratio = upper_count / len(method_name)
 
-            # 统计连续大写字母的最大长度
             max_upper_seq = 0
             current_seq = 0
             for c in method_name:
@@ -114,37 +102,31 @@ class FunctionCallGraph:
                 else:
                     current_seq = 0
 
-            # 检查驼峰式命名的有效性
             is_valid_camel_case = (
-                    method_name[0].islower() and  # 首字母小写
-                    upper_count >= 1 and  # 至少一个大写字母
-                    max_upper_seq == 1 and  # 没有连续大写
-                    upper_ratio < 0.3 # 大写字母比例不过高
+                    method_name[0].islower() and
+                    upper_count >= 1 and
+                    max_upper_seq == 1 and
+                    upper_ratio < 0.3
 
             )
 
-            # 检查常见前缀/后缀
             common_prefixes = ['get', 'set', 'is', 'has', 'on', 'do']
             has_common_prefix = any(method_name.startswith(prefix) for prefix in common_prefixes)
 
-            # 检查常见后缀
             common_suffixes = ['able', 'tion', 'ment', 'ing', 'ed']
             has_common_suffix = any(method_name.lower().endswith(suffix) for suffix in common_suffixes)
 
-            # 如果是有效的驼峰式命名或有常见前后缀，则保留
             if is_valid_camel_case or has_common_prefix or has_common_suffix:
                 return False
             if upper_count >=  5:
                 return True
 
-            # 如果不符合上述条件，且满足以下任一条件，则认为是垃圾
             if (upper_ratio > 0.4) or (max_upper_seq >= 3):
                 return True
 
-            # 检查元音字母比例（随机字符串通常元音较少）
             vowel_count = sum(1 for c in method_name.lower() if c in 'aeiou')
             vowel_ratio = vowel_count / len(method_name)
-            if vowel_ratio < 0.2:  # 元音比例低于20%
+            if vowel_ratio < 0.2:
                 return True
 
         return False
@@ -205,15 +187,15 @@ class FunctionCallGraph:
                       self.graph.degree(node) == 2 and (node, node) in self.graph.edges()]
         self.graph.remove_nodes_from(self_loops)
 
-    def detect_communities_louvain(self, resolution=1, random_state=True, weight="weight"):
+    def detect_csmaliopcodeunities_louvain(self, resolution=1, random_state=True, weight="weight"):
         undirected_graph = self.graph.to_undirected()
         partition = community.best_partition(undirected_graph, resolution=resolution, random_state=42, weight=weight)
-        communities = {}
+        csmaliopcodeunities = {}
         for node, community_id in partition.items():
-            if community_id not in communities:
-                communities[community_id] = []
-            communities[community_id].append(node)
-        return list(communities.values())
+            if community_id not in csmaliopcodeunities:
+                csmaliopcodeunities[community_id] = []
+            csmaliopcodeunities[community_id].append(node)
+        return list(csmaliopcodeunities.values())
 
     def remove_small_subgraphs(self, threshold):
         small_subgraphs = [subgraph for subgraph in nx.connected_components(self.graph.to_undirected()) if
@@ -221,7 +203,7 @@ class FunctionCallGraph:
         for subgraph_nodes in small_subgraphs:
             self.graph.remove_nodes_from(subgraph_nodes)
 
-    def save_processed_graph(self, communities, output_folder):
+    def save_processed_graph(self, csmaliopcodeunities, output_folder):
         processed_graph = self.graph.copy()
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
@@ -230,7 +212,7 @@ class FunctionCallGraph:
             u_community = None
             v_community = None
 
-            for idx, community in enumerate(communities):
+            for idx, community in enumerate(csmaliopcodeunities):
                 if u in community:
                     u_community = idx
                 if v in community:

@@ -30,7 +30,6 @@ def find_icon_file(decompiled_apk_dir, resource_type, resource_name):
                             if file.startswith(resource_name) and any(file.endswith(ext) for ext in extensions):
                                 icon_files.append(os.path.join(icon_dir, file))
                     except FileNotFoundError:
-                        # 某些情况下目录可能在遍历期间被移除，忽略即可
                         continue
     return icon_files
 
@@ -64,7 +63,6 @@ def collect_apk_icons(decompiled_apk_dir):
         if application is not None:
             icon_resource = application.get(f"{namespace}icon")
             if icon_resource and icon_resource.startswith("@"):
-                # icon_resource 例如 "@mipmap/ic_launcher" 或 "@drawable/ic_launcher"
                 try:
                     resource_type, resource_name = icon_resource[1:].split("/")
                 except ValueError:
@@ -81,11 +79,10 @@ def collect_apk_icons(decompiled_apk_dir):
     return None
 
 if __name__ == "__main__":
-    base_directory = "/newdisk/liuzhuowu/analysis/data/decom"  # 修改为你的根目录
+    base_directory = "/newdisk/liuzhuowu/analysis/data/decom"
     log_file = os.path.join(base_directory, "collect_icons.log")
     setup_logging(log_file)
 
-    # 收集所有 APK 反编译目录（假设结构为 base/<group>/<apk_dir>/）
     all_apk_paths = []
     if os.path.isdir(base_directory):
         for group_folder_name in os.listdir(base_directory):
@@ -98,7 +95,6 @@ if __name__ == "__main__":
 
     all_apk_paths = sorted(all_apk_paths)
 
-    # 遍历每个 apk 目录，查找图标并复制到该目录下的 icon 子文件夹
     for apk_path in tqdm(all_apk_paths, desc="Processing APKs", unit="apk"):
         try:
             icon_file = collect_apk_icons(apk_path)
@@ -107,7 +103,6 @@ if __name__ == "__main__":
                 os.makedirs(icon_dir, exist_ok=True)
 
                 dest_path = os.path.join(icon_dir, os.path.basename(icon_file))
-                # 若已存在同名文件则先移除（可按需改为跳过或重命名）
                 if os.path.exists(dest_path):
                     os.remove(dest_path)
 

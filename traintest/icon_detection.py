@@ -15,9 +15,6 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 from torchvision.models import vgg19, VGG19_Weights
 
-# ------------------------------
-# 1. 模型与数据集定义
-# ------------------------------
 
 class VGG19FeatureExtractor(nn.Module):
     def __init__(self, layer_names):
@@ -31,13 +28,11 @@ class VGG19FeatureExtractor(nn.Module):
 
     def forward(self, x):
         feature_maps = {}
-        # VGG features part
         for name, layer in self.features._modules.items():
             x = layer(x)
             if name in self.layer_names:
                 feature_maps[name] = x
         
-        # Classifier part (for fc2)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
@@ -64,11 +59,9 @@ class IconDataset(Dataset):
                 image = self.transform(image)
             return path, image
         except Exception:
-            # 返回 None 表示加载失败
             return path, None
 
 def collate_fn(batch):
-    # 过滤掉加载失败的图片 (None)
     batch = [item for item in batch if item[1] is not None]
     if not batch:
         return [], torch.Tensor()
@@ -83,9 +76,6 @@ def convert_rgba_to_rgb(image):
     else:
         return image.convert('RGB')
 
-# ------------------------------
-# 2. 辅助函数：文件扫描与配对
-# ------------------------------
 
 def find_icon_path(apk_project_path):
     images_dir = os.path.join(apk_project_path, 'images')
@@ -164,9 +154,6 @@ def sample_negative_pairs_from_cache(all_group_projects, current_group_id, targe
         
     return neg_pairs
 
-# ------------------------------
-# 3. 核心优化：批量特征提取与矩阵检测
-# ------------------------------
 
 def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size, workers):
     """
@@ -175,14 +162,12 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
     3. 使用矩阵点积批量计算相似度
     """
     
-    # --- A. 准备阶段 ---
     unique_paths = list(set(icons_map.values()))
     path_to_idx = {p: i for i, p in enumerate(unique_paths)}
     num_icons = len(unique_paths)
     
     print(f"唯一图标总数: {num_icons}")
     
-    # 转换
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -192,16 +177,12 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, 
                         num_workers=workers, collate_fn=collate_fn, pin_memory=True)
 
-    # --- B. 特征提取阶段 (Feature Extraction) ---
-    # 定义维度: fc2=4096, style(conv5_4)=512*512=262144
     content_dim = 4096
     style_dim = 512 * 512
     
-    # 使用 Float16 节省内存，先存在 CPU 上以防显存不足
     all_content = torch.zeros((num_icons, content_dim), dtype=torch.float16)
     all_style = torch.zeros((num_icons, style_dim), dtype=torch.float16)
     
-    # 记录成功加载的索引
     loaded_indices = set()
     
     t_feat_start = time.time()
@@ -212,32 +193,23 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
             if len(paths) == 0:
                 continue
             
-            # 移入 GPU
             images = images.to(device)
             
-            # Forward
             feats = model(images)
             
-            # 1. Content Feature (fc2)
-            f_content = feats['fc2'] # [B, 4096]
-            # L2 Normalize immediately
+            f_content = feats['fc2']
             f_content = torch.nn.functional.normalize(f_content, p=2, dim=1)
             
-            # 2. Style Feature (Gram Matrix)
-            f_style = feats['28'] # [B, 512, H, W]
+            f_style = feats['28']
             b, ch, h, w = f_style.size()
             f_style = f_style.view(b, ch, h * w)
-            # Gram calculation: (B, C, HW) x (B, HW, C) -> (B, C, C)
             grams = torch.bmm(f_style, f_style.transpose(1, 2)) / (ch * h * w)
-            grams = grams.view(b, -1) # Flatten -> [B, 262144]
-            # L2 Normalize immediately
+            grams = grams.view(b, -1)
             grams = torch.nn.functional.normalize(grams, p=2, dim=1)
             
-            # 转回 CPU 并转为半精度存储
             f_content_cpu = f_content.cpu().half()
             grams_cpu = grams.cpu().half()
             
-            # 填入大表
             for i, p in enumerate(paths):
                 idx = path_to_idx[p]
                 all_content[idx] = f_content_cpu[i]
@@ -246,15 +218,12 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
 
     feature_time = time.time() - t_feat_start
 
-    # --- C. 相似度检测阶段 (Detection) ---
     t_detect_start = time.time()
     
-    # 1. 筛选有效对并将路径转换为索引
     valid_pairs_indices = []
-    valid_pairs_meta = [] # (gid, apk1, apk2, label)
+    valid_pairs_meta = []
     
     for gid, a, b, lab in all_pairs:
-        # 必须两个图标路径都在，且都成功加载了特征
         if a in icons_map and b in icons_map:
             path_a = icons_map[a]
             path_b = icons_map[b]
@@ -268,7 +237,6 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
     if not valid_pairs_indices:
         return pd.DataFrame(), feature_time, 0.0
 
-    # 2. 准备批量计算
     pairs_tensor = torch.tensor(valid_pairs_indices, dtype=torch.long)
     idx_A = pairs_tensor[:, 0]
     idx_B = pairs_tensor[:, 1]
@@ -277,41 +245,24 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
     sims_content = []
     sims_style = []
     
-    # 根据显存大小调整 batch
-    # 5000 pairs * 26w dims * 2 (float16) * 2 (A&B) ≈ 5GB data per batch if fully expanded
-    # 但我们只取 index，实际运算在 GPU
     calc_batch_size = 5000 
     
-    # 尝试将大矩阵移入 GPU (如果显存 > 8GB 且图标数 < 10000 可能放得下)
-    # Style Matrix: 10000 * 262144 * 2 bytes = 5 GB
-    # 为求稳妥，默认放在 CPU，每个 batch 拷贝需要的数据进 GPU
-    # 如果你显存很大(24G+)，可以把 all_style.to(device)
     
-    # all_content 比较小，可以常驻 GPU
     all_content = all_content.to(device)
-    # all_style 保持在 CPU 或根据显存情况决定
-    # all_style = all_style.to(device) 
     
     print(f"开始批量比对 {num_pairs} 对样本...")
     
     for i in tqdm(range(0, num_pairs, calc_batch_size), desc="[2/2] GPU加速比对", unit="blk"):
         end = min(i + calc_batch_size, num_pairs)
         
-        # 获取当前 batch 的索引
         batch_idx_a = idx_A[i:end].to(device)
         batch_idx_b = idx_B[i:end].to(device)
         
-        # --- Content Sim ---
-        # 索引获取特征 (已经在 GPU)
         c_a = all_content[batch_idx_a]
         c_b = all_content[batch_idx_b]
-        # Dot Product (因为已经归一化，点积==余弦相似度)
         sim_c = (c_a * c_b).sum(dim=1)
-        sims_content.append(sim_c.cpu().float()) # 存回 float32
+        sims_content.append(sim_c.cpu().float())
         
-        # --- Style Sim ---
-        # 索引获取特征 (从 CPU 拷贝到 GPU)
-        # 注意：这里需要先把 indices 转回 CPU 才能去 slice cpu tensor (如果 all_style 在 cpu)
         b_idx_a_cpu = idx_A[i:end]
         b_idx_b_cpu = idx_B[i:end]
         
@@ -321,17 +272,14 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
         sim_s = (s_a * s_b).sum(dim=1)
         sims_style.append(sim_s.cpu().float())
         
-        # 显存清理 (非必须，但保险)
         del s_a, s_b, c_a, c_b
     
-    # 拼接结果
     sims_content = torch.cat(sims_content).numpy()
     sims_style = torch.cat(sims_style).numpy()
     sims_overall = 0.6 * sims_content + 0.4 * sims_style
     
     detect_time = time.time() - t_detect_start
     
-    # --- D. 组装结果 ---
     results = []
     for i, (gid, a, b, lab) in enumerate(valid_pairs_meta):
         results.append({
@@ -346,9 +294,6 @@ def extract_and_detect_optimized(model, device, icons_map, all_pairs, batch_size
         
     return pd.DataFrame(results), feature_time, detect_time
 
-# ------------------------------
-# 4. 主流程
-# ------------------------------
 
 def run_icon_detection(args):
     """
@@ -359,21 +304,17 @@ def run_icon_detection(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    # 目录准备
     interm_dir = os.path.join(args.intermediate_root, 'image', 'all_groups')
     result_dir = os.path.join(args.result_root, 'image')
     os.makedirs(interm_dir, exist_ok=True)
     os.makedirs(result_dir, exist_ok=True)
 
-    # 设备
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"[Icon] Running on {device}")
 
-    # 模型加载
     layer_names = ['28', 'fc2']
     vgg_model = VGG19FeatureExtractor(layer_names).to(device).eval()
 
-    # 1. 扫描组
     all_ids = list_group_ids(args.root)
     if not all_ids:
         print('[Icon] 根目录下未找到数字序号文件夹。')
@@ -388,7 +329,6 @@ def run_icon_detection(args):
     sampled_ids = random.sample(all_ids, sample_count)
     print(f"[Icon] 已抽样 {len(sampled_ids)} 个组。")
 
-    # 2. 构建正负样本对
     pos_pairs_by_group = {}
     neg_pairs_by_group = {}
     
@@ -397,11 +337,9 @@ def run_icon_detection(args):
         pos_pairs = build_positive_pairs(originals, repacks)
         pos_pairs_by_group[gid] = pos_pairs
         
-        # 负样本采样
         neg_pairs = sample_negative_pairs_from_cache(all_group_projects, gid, target_num=len(pos_pairs))
         neg_pairs_by_group[gid] = neg_pairs
 
-    # 记录负样本对日志
     neg_log_path = os.path.join(result_dir, f'negative_pairs_all_sampled.csv')
     neg_rows = []
     for gid in neg_pairs_by_group:
@@ -409,8 +347,7 @@ def run_icon_detection(args):
             neg_rows.append({'group_id': gid, 'apk1': a, 'apk2': b})
     pd.DataFrame(neg_rows).to_csv(neg_log_path, index=False, encoding='utf-8-sig')
 
-    # 3. 收集所有需要的图标路径
-    all_pairs_list = [] # (gid, a, b, lab)
+    all_pairs_list = []
     all_projects = set()
     
     for gid in sampled_ids:
@@ -434,7 +371,6 @@ def run_icon_detection(args):
         print("[Icon] 未找到任何图标，程序结束。")
         return None
 
-    # 4. 执行核心优化流程：提取 -> 矩阵计算
     df, feat_time, detect_time = extract_and_detect_optimized(
         model=vgg_model,
         device=device,
@@ -448,7 +384,6 @@ def run_icon_detection(args):
         print('[Icon] 无有效结果。')
         return None
 
-    # 5. 指标计算与保存
     print("[Icon] 计算评估指标...")
     df['pred'] = (df['overall_similarity'] >= args.threshold).astype(int)
     
@@ -467,7 +402,6 @@ def run_icon_detection(args):
     detect_avg = detect_time / total_pairs if total_pairs > 0 else 0
     total_avg = feat_avg + detect_avg
 
-    # 分组指标
     group_metrics_rows = []
     for gid, gdf in df.groupby('group_id'):
         tp_g = int(((gdf['label'] == 1) & (gdf['pred'] == 1)).sum())

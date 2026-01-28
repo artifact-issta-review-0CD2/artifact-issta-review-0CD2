@@ -26,9 +26,8 @@ class SoTrainer:
             self.optimizer.zero_grad()
             
             emb1, emb2 = self.model(x1, x2)
-            cos = F.cosine_similarity(emb1, emb2) # [B]
+            cos = F.cosine_similarity(emb1, emb2)
             
-            # 损失计算
             pos_loss = (1 - cos[y==1]).mean() if (y==1).any() else 0
             neg_loss = F.relu(cos[y==-1] - self.margin).mean() if (y==-1).any() else 0
             loss = pos_loss + self.neg_weight * neg_loss

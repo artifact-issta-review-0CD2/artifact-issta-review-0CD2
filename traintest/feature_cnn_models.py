@@ -17,14 +17,11 @@ class VectorDataset(Dataset):
     def __init__(self, andro_dir):
         self.pair_paths = []
 
-        # 遍历 andro_dir 下的子文件夹
         for first_level in os.listdir(andro_dir):
             first_level_path = os.path.join(andro_dir, first_level)
             if os.path.isdir(first_level_path):
-                # 初始化 original_apk 的路径
                 original_apk_freq_path = None
 
-                # 遍历 original_apk 文件夹
                 original_apk_path = os.path.join(first_level_path, "original_apk")
                 if os.path.exists(original_apk_path) and os.path.isdir(original_apk_path):
                     for file in os.listdir(original_apk_path):
@@ -33,9 +30,8 @@ class VectorDataset(Dataset):
                             freq_path = os.path.join(original_apk_path, apk_name, 'data_read_frequency.npy')
                             if os.path.exists(freq_path) and not np.all(np.load(freq_path) == 0):
                                 original_apk_freq_path = freq_path
-                                break  # 只取一个有效的 original_apk
+                                break
 
-                # 如果找到有效的 original_apk，遍历 repack_apk 中的所有 APK
                 if original_apk_freq_path:
                     repack_apk_path = os.path.join(first_level_path, "repack_apk")
                     if os.path.exists(repack_apk_path) and os.path.isdir(repack_apk_path):
@@ -44,7 +40,6 @@ class VectorDataset(Dataset):
                                 apk_name = os.path.splitext(file)[0]
                                 freq_path = os.path.join(repack_apk_path, apk_name, 'data_read_frequency.npy')
                                 if os.path.exists(freq_path) and not np.all(np.load(freq_path) == 0):
-                                    # 将 original_apk 与每个有效的 repack_apk 配对
                                     self.pair_paths.append((original_apk_freq_path, freq_path))
 
         print(f"Total number of valid pairs: {len(self.pair_paths)}")
@@ -54,8 +49,8 @@ class VectorDataset(Dataset):
 
     def __getitem__(self, idx):
         origin_npy_path, repack_npy_path = self.pair_paths[idx]
-        origin_npy = np.load(origin_npy_path)  # 形状为 (78,)
-        repack_npy = np.load(repack_npy_path)  # 形状为 (78,)
+        origin_npy = np.load(origin_npy_path)
+        repack_npy = np.load(repack_npy_path)
         return torch.tensor(origin_npy, dtype=torch.float32), torch.tensor(repack_npy, dtype=torch.float32)
 
 def contrastive_loss(features, temperature=0.07):
@@ -79,18 +74,15 @@ def contrastive_loss(features, temperature=0.07):
     return F.cross_entropy(logits, labels)
 
 def visualize_tsne(features, epoch, save_dir='tsne_images'):
-    # Reduce dimensions with t-SNE
     tsne = TSNE(n_components=2, random_state=42)
     reduced_features = tsne.fit_transform(features)
 
-    # Create a scatter plot
     plt.figure(figsize=(8, 6))
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c='blue', label='Features')
     plt.title(f't-SNE Visualization (Epoch {epoch})')
     plt.xlabel('t-SNE Component 1')
     plt.ylabel('t-SNE Component 2')
 
-    # Save the plot
     os.makedirs(save_dir, exist_ok=True)
     plt.savefig(os.path.join(save_dir, f'tsne_epoch_{epoch}.png'))
     plt.close()
@@ -150,15 +142,14 @@ class SOOpcodeDetailCaptureCNN(nn.Module):
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2), # 94 -> 47
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2), # 47 -> 23
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
-        # 64 * 23 * 23 = 33856
         self.projection_head = nn.Sequential(
             nn.Linear(64 * 23 * 23, 512),
             nn.ReLU(inplace=True),
@@ -173,11 +164,9 @@ class SOOpcodeDetailCaptureCNN(nn.Module):
         x = self.cnn_layers(x)
         x = x.view(x.size(0), -1)
         x = self.projection_head(x)
-        # 关键：输出已经归一化，后续只需做点积
         return F.normalize(x, dim=1)
 
     def forward(self, input1, input2=None):
-        # 支持单个输入（用于特征提取）或成对输入（用于训练）
         if input2 is None:
             return self.forward_once(input1)
         output1 = self.forward_once(input1)
@@ -196,14 +185,11 @@ def calculate_metrics(predictions, labels):
     return recall, accuracy
 
 if __name__ == "__main__":
-    # Use GPU if available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     data_dir = r'/newdisk/liuzhuowu/lzw/apks_wdj/'
-    # Note: NPZPairDataset was referenced but not defined in the original file, using VectorDataset instead which is defined
     dataset = VectorDataset(data_dir)
 
-    # Split dataset into train and test sets
     train_size = int(0.7 * len(dataset))
     test_size = len(dataset) - train_size
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
@@ -231,11 +217,9 @@ if __name__ == "__main__":
             optimizer.step()
             all_features.append(features.detach().cpu().numpy())
 
-        # After each epoch, visualize the embeddings using t-SNE
         all_features = np.concatenate(all_features, axis=0)
         visualize_tsne(all_features, epoch + 1)
 
-        # Calculate recall and accuracy on test set
         detail_cnn.eval()
         test_preds = []
         test_labels = []
@@ -247,11 +231,11 @@ if __name__ == "__main__":
                 
                 similarities = F.cosine_similarity(features1, features2)
                 test_preds.extend(similarities.cpu().numpy())
-                test_labels.extend([1] * len(similarities))  # All repark samples are positives
+                test_labels.extend([1] * len(similarities))
 
         test_preds = torch.tensor(test_preds)
         test_labels = torch.tensor(test_labels)
-        threshold = 0.7  # Adjust the threshold as necessary
+        threshold = 0.7
         binary_preds = (test_preds >= threshold).int()
         recall, accuracy = calculate_metrics(binary_preds, test_labels)
 
